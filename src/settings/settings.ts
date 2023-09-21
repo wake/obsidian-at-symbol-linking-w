@@ -11,7 +11,7 @@ import { FileSuggest } from "./file-suggest";
 
 export interface AtSymbolLinkingSettings {
 	limitLinkDirectories: Array<string>;
-  limitLinkDirectoryOptions: Array<{fullpath: boolean}>;
+  limitLinkDirectoryOptions: Array<{symbol: string, fullpath: boolean}>;
 	includeSymbol: boolean;
 
 	showAddNewNote: boolean;
@@ -111,7 +111,7 @@ export class SettingsTab extends PluginSettingTab {
 					.setCta()
 					.onClick(async () => {
 						this.plugin.settings.limitLinkDirectories.push("");
-            this.plugin.settings.limitLinkDirectoryOptions.push({fullpath: false});
+            this.plugin.settings.limitLinkDirectoryOptions.push({symbol: '', fullpath: false});
 						await this.plugin.saveSettings();
 						return this.display();
 					});
@@ -122,6 +122,19 @@ export class SettingsTab extends PluginSettingTab {
         const fullpath = this.plugin.settings.limitLinkDirectoryOptions[index]?.fullpath ?? false;
 				const newDirectorySetting = new Setting(this.containerEl)
 					.setClass("at-symbol-linking-folder-container")
+          .addText((text) => {
+            text.setPlaceholder("@")
+              .setValue(
+                this.plugin.settings.limitLinkDirectoryOptions[index]?.symbol?.toString()
+              )
+              .onChange(async (value) => {
+                this.plugin.settings.limitLinkDirectoryOptions[index].symbol = value;
+                await this.plugin.saveSettings();
+              });
+            text.inputEl.onblur = () => {
+              this.validate();
+            };
+          })
 					.addSearch((cb) => {
 						new FolderSuggest(this.app, cb.inputEl);
 						cb.setPlaceholder("Folder")
@@ -178,7 +191,7 @@ export class SettingsTab extends PluginSettingTab {
             toggle
               .setValue(fullpath)
               .onChange(async (value: boolean) => {
-                this.plugin.settings.limitLinkDirectoryOptions[index] = this.plugin.settings.limitLinkDirectoryOptions[index] ?? {};
+                this.plugin.settings.limitLinkDirectoryOptions[index] = this.plugin.settings.limitLinkDirectoryOptions[index] ?? {symbol: '', fullpath: false};
                 this.plugin.settings.limitLinkDirectoryOptions[index].fullpath = value;
                 await this.plugin.saveSettings();
                 this.display();
