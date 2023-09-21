@@ -242,17 +242,31 @@ export default class SuggestionPopup extends EditorSuggest<
 			return this.closeSuggestion();
 		}
 
-    /*
 		// If query is empty or doesn't have valid filename characters, close
 		if (
-			!query ||
-			!/[a-z0-9\\$\\-\\_\\!\\%\\"\\'\\.\\,\\*\\&\\(\\)\\;\\{\\}\\+\\=\\~\\`\\?)]/i.test(
-				query
-			)
+			!query || (
+
+        // Mandarin Chinese & Simplified Chinese
+        !/[\u4e00-\u9fff]|[\u3100-\u312F]/i.test(query)
+
+        // Emoji
+        && !/\p{Extended_Pictographic}/u.test(query)
+
+        // Fullwidth Forms
+        && !/[\u4E00-\u9FFF]|[\u3000-\u303F]|[\u2200-\u22FF]|[\uFF00-\uFFEF]/i.test(query)
+
+        // Japanese
+        && !/[\u3040-\u309F]|[\u30A0-\u30FF]|[\u4E00-\u9FFF]/i.test(query)
+
+        // Korean
+        && !/[\uAC00-\uD7AF]|[\u1100-\u11FF]/i.test(query)
+
+        // Other valid filename characters
+        && !/[a-z0-9\\$\\-\\_\\!\\%\\"\\'\\.\\,\\*\\&\\(\\)\\;\\{\\}\\+\\=\\~\\`\\?)]/i.test(query)
+      )
 		) {
 			return this.closeSuggestion();
 		}
-    */
 
 		return {
 			start: { ...cursor, ch: cursor.ch - matchedSymbolLength },
