@@ -1,6 +1,6 @@
 {
-  "id": "at-symbol-linking",
-  "name": "@ Symbol Linking",
+  "id": "at-symbol-linking-w",
+  "name": "@ Symbol Linking (W)",
   "version": "1.4.6",
   "minAppVersion": "0.15.0",
   "description": "Adds ability to link with @ (the At Symbol) in Obsidian. Can limit @ linking to specific folders e.g. People/",
