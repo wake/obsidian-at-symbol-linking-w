@@ -26,6 +26,7 @@ export default class SuggestionPopup extends EditorSuggest<
 	private focused = false;
 	private app: App;
 	public name = "@ Symbol Linking Suggest";
+  private activeSymbol = '@';
 
 	constructor(app: App, settings: AtSymbolLinkingSettings) {
 		super(app);
@@ -60,6 +61,13 @@ export default class SuggestionPopup extends EditorSuggest<
 			if (this.settings.limitLinkDirectories.length > 0) {
 				let isAllowed = false;
 				for (const [index, folder] of this.settings.limitLinkDirectories.entries()) {
+
+          if (folder === '') continue;
+
+          const symbol = this.settings.limitLinkDirectoryOptions[index]?.symbol || '@';
+
+          if (symbol !== this.activeSymbol) continue;
+
 					if (file.path.startsWith(folder)) {
 						isAllowed = true;
             isFullpath = this.settings.limitLinkDirectoryOptions[index]?.fullpath || false;
@@ -147,11 +155,18 @@ export default class SuggestionPopup extends EditorSuggest<
 		cursor: EditorPosition,
 		editor: Editor
 	): EditorSuggestTriggerInfo | null {
-		let query = "";
-		const typedChar = editor.getRange(
-			{ ...cursor, ch: cursor.ch - 1 },
+
+    let query = "";
+
+    const symbols = this.settings.limitLinkDirectoryOptions?.map(option => (option.symbol || '@')) || ['@'];
+    const maxSymbolLength = Math.max(...symbols.map(symbol => symbol.length));
+
+    const catchedChars = editor.getRange(
+			{ ...cursor, ch: cursor.ch - maxSymbolLength },
 			{ ...cursor, ch: cursor.ch }
 		);
+
+    const typedChar = catchedChars.length > 0 ? catchedChars.charAt(catchedChars.length - 1) : "\n";
 
 		// When open and user enters newline or tab, close
 		if (
@@ -188,11 +203,20 @@ export default class SuggestionPopup extends EditorSuggest<
 			return null;
 		}
 
-		// Open suggestion when @ is typed
-		if (typedChar === "@") {
+    const matchedSymbol = symbols.find(symbol => 
+      symbol === catchedChars.slice(-symbol.length)
+    );
+
+    const matchedSymbolLength = matchedSymbol ? matchedSymbol.length : 1;
+
+    if (!this.firstOpenedCursor)
+      this.activeSymbol = matchedSymbol || '@';
+
+    // Open suggestion when @ is typed
+    if (matchedSymbol) {
 			this.firstOpenedCursor = cursor;
 			return {
-				start: { ...cursor, ch: cursor.ch - 1 },
+				start: { ...cursor, ch: cursor.ch - matchedSymbolLength },
 				end: cursor,
 				query,
 			};
@@ -218,6 +242,7 @@ export default class SuggestionPopup extends EditorSuggest<
 			return this.closeSuggestion();
 		}
 
+    /*
 		// If query is empty or doesn't have valid filename characters, close
 		if (
 			!query ||
@@ -227,9 +252,10 @@ export default class SuggestionPopup extends EditorSuggest<
 		) {
 			return this.closeSuggestion();
 		}
+    */
 
 		return {
-			start: { ...cursor, ch: cursor.ch - 1 },
+			start: { ...cursor, ch: cursor.ch - matchedSymbolLength },
 			end: cursor,
 			query,
 		};
@@ -333,7 +359,7 @@ export default class SuggestionPopup extends EditorSuggest<
 			) as TFile;
 		}
 		let alias = value.obj?.alias || value.obj?.fileName;
-		if (this.settings.includeSymbol) alias = `@${alias}`;
+		if (this.settings.includeSymbol) alias = `${this.activeSymbol}${alias}`;
 		let linkText = this.app.fileManager.generateMarkdownLink(
 			linkFile,
 			currentFile?.path || "",
@@ -347,7 +373,7 @@ export default class SuggestionPopup extends EditorSuggest<
 
 		this.context?.editor.replaceRange(
 			linkText,
-			{ line: this.context.start.line, ch: line.lastIndexOf("@") },
+			{ line: this.context.start.line, ch: line.lastIndexOf(this.activeSymbol) },
 			this.context.end
 		);
 
