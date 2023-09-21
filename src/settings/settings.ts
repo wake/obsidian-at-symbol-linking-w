@@ -11,6 +11,7 @@ import { FileSuggest } from "./file-suggest";
 
 export interface AtSymbolLinkingSettings {
 	limitLinkDirectories: Array<string>;
+  limitLinkDirectoryOptions: Array<{fullpath: boolean}>;
 	includeSymbol: boolean;
 
 	showAddNewNote: boolean;
@@ -23,6 +24,7 @@ export interface AtSymbolLinkingSettings {
 
 export const DEFAULT_SETTINGS: AtSymbolLinkingSettings = {
 	limitLinkDirectories: [],
+  limitLinkDirectoryOptions: [],
 	includeSymbol: true,
 
 	showAddNewNote: false,
@@ -59,7 +61,7 @@ export class SettingsTab extends PluginSettingTab {
 		this.containerEl.empty();
 
 		this.containerEl.appendChild(
-			createHeading(this.containerEl, "At Symbol (@) Linking Settings")
+			createHeading(this.containerEl, "At Symbol (@) Linking Settings (W)")
 		);
 
 		// Begin includeSymbol option: Determine whether to include @ symbol in link
@@ -109,6 +111,7 @@ export class SettingsTab extends PluginSettingTab {
 					.setCta()
 					.onClick(async () => {
 						this.plugin.settings.limitLinkDirectories.push("");
+            this.plugin.settings.limitLinkDirectoryOptions.push({fullpath: false});
 						await this.plugin.saveSettings();
 						return this.display();
 					});
@@ -116,6 +119,7 @@ export class SettingsTab extends PluginSettingTab {
 
 		this.plugin.settings.limitLinkDirectories.forEach(
 			(directory, index) => {
+        const fullpath = this.plugin.settings.limitLinkDirectoryOptions[index]?.fullpath ?? false;
 				const newDirectorySetting = new Setting(this.containerEl)
 					.setClass("at-symbol-linking-folder-container")
 					.addSearch((cb) => {
@@ -169,7 +173,18 @@ export class SettingsTab extends PluginSettingTab {
 								await this.plugin.saveSettings();
 								this.display();
 							});
-					});
+					})
+          .addToggle((toggle) =>
+            toggle
+              .setValue(fullpath)
+              .onChange(async (value: boolean) => {
+                this.plugin.settings.limitLinkDirectoryOptions[index] = this.plugin.settings.limitLinkDirectoryOptions[index] ?? {};
+                this.plugin.settings.limitLinkDirectoryOptions[index].fullpath = value;
+                await this.plugin.saveSettings();
+                this.display();
+              })
+          );
+  
 				newDirectorySetting.controlEl.addClass(
 					"at-symbol-linking-folder-setting"
 				);

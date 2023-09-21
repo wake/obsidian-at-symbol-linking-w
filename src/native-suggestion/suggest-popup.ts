@@ -52,12 +52,17 @@ export default class SuggestionPopup extends EditorSuggest<
 	): Fuzzysort.KeysResult<fileOption>[] {
 		const options: fileOption[] = [];
 		for (const file of context.file.vault.getMarkdownFiles()) {
-			// If there are folders to limit links to, check if the file is in one of them
+
+      let isFullpath = false;
+      const fullpath = file.path.slice(0, -file.extension.length - 1);
+
+      // If there are folders to limit links to, check if the file is in one of them
 			if (this.settings.limitLinkDirectories.length > 0) {
 				let isAllowed = false;
-				for (const folder of this.settings.limitLinkDirectories) {
+				for (const [index, folder] of this.settings.limitLinkDirectories.entries()) {
 					if (file.path.startsWith(folder)) {
 						isAllowed = true;
+            isFullpath = this.settings.limitLinkDirectoryOptions[index]?.fullpath || false;
 						break;
 					}
 				}
@@ -65,10 +70,10 @@ export default class SuggestionPopup extends EditorSuggest<
 					continue;
 				}
 			}
-			const meta = app.metadataCache.getFileCache(file);
+      const meta = app.metadataCache.getFileCache(file);
 			if (meta?.frontmatter?.alias) {
 				options.push({
-					fileName: file.basename,
+					fileName: !isFullpath ? file.basename : fullpath,
 					filePath: file.path,
 					alias: meta.frontmatter.alias,
 				});
@@ -81,7 +86,7 @@ export default class SuggestionPopup extends EditorSuggest<
 				}
 				for (const alias of aliases) {
 					options.push({
-						fileName: file.basename,
+						fileName: !isFullpath ? file.basename : fullpath,
 						filePath: file.path,
 						alias: alias,
 					});
@@ -89,7 +94,7 @@ export default class SuggestionPopup extends EditorSuggest<
 			}
 			// Include fileName without alias as well
 			options.push({
-				fileName: file.basename,
+				fileName: !isFullpath ? file.basename : fullpath,
 				filePath: file.path,
 			});
 		}
