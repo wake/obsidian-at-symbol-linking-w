@@ -123,7 +123,7 @@ export class SettingsTab extends PluginSettingTab {
 				const newDirectorySetting = new Setting(this.containerEl)
 					.setClass("at-symbol-linking-folder-container")
           .addText((text) => {
-            text.setPlaceholder("@")
+            text.setPlaceholder("@ (Triger Symbol)")
               .setValue(
                 this.plugin.settings.limitLinkDirectoryOptions[index]?.symbol?.toString()
               )
@@ -158,6 +158,11 @@ export class SettingsTab extends PluginSettingTab {
 									index,
 									index - 1
 								);
+								arrayMove(
+									this.plugin.settings.limitLinkDirectoryOptions,
+									index,
+									index - 1
+								);
 								await this.plugin.saveSettings();
 								this.display();
 							});
@@ -168,6 +173,11 @@ export class SettingsTab extends PluginSettingTab {
 							.onClick(async () => {
 								arrayMove(
 									this.plugin.settings.limitLinkDirectories,
+									index,
+									index + 1
+								);
+								arrayMove(
+									this.plugin.settings.limitLinkDirectoryOptions,
 									index,
 									index + 1
 								);
@@ -183,6 +193,10 @@ export class SettingsTab extends PluginSettingTab {
 									index,
 									1
 								);
+								this.plugin.settings.limitLinkDirectoryOptions.splice(
+									index,
+									1
+								);
 								await this.plugin.saveSettings();
 								this.display();
 							});
@@ -190,6 +204,7 @@ export class SettingsTab extends PluginSettingTab {
           .addToggle((toggle) =>
             toggle
               .setValue(fullpath)
+              .setTooltip("Display fullpath in link text")
               .onChange(async (value: boolean) => {
                 this.plugin.settings.limitLinkDirectoryOptions[index] = this.plugin.settings.limitLinkDirectoryOptions[index] ?? {symbol: '', fullpath: false};
                 this.plugin.settings.limitLinkDirectoryOptions[index].fullpath = value;
