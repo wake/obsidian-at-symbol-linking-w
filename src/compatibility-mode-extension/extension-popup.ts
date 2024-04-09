@@ -225,8 +225,8 @@ export class LinkSuggest implements IOwner<Fuzzysort.KeysResult<fileOption>> {
 			// If there are folders to limit links to, check if the file is in one of them
 			if (this.settings.limitLinkDirectories.length > 0) {
 				let isAllowed = false;
-				for (const folder of this.settings.limitLinkDirectories) {
-					if (file.path.startsWith(folder)) {
+				for (const option of this.settings.limitLinkDirectories) {
+					if (file.path.startsWith(option.folder)) {
 						isAllowed = true;
 						break;
 					}

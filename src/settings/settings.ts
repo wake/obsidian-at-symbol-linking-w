@@ -10,8 +10,7 @@ import { FolderSuggest } from "./folder-suggest";
 import { FileSuggest } from "./file-suggest";
 
 export interface AtSymbolLinkingSettings {
-	limitLinkDirectories: Array<string>;
-  limitLinkDirectoryOptions: Array<{symbol: string, fullpath: boolean}>;
+	limitLinkDirectories: Array<{folder:string, symbol: string, fullpath: boolean}>;
 	includeSymbol: boolean;
 
 	showAddNewNote: boolean;
@@ -24,7 +23,6 @@ export interface AtSymbolLinkingSettings {
 
 export const DEFAULT_SETTINGS: AtSymbolLinkingSettings = {
 	limitLinkDirectories: [],
-  limitLinkDirectoryOptions: [],
 	includeSymbol: true,
 
 	showAddNewNote: false,
@@ -110,25 +108,24 @@ export class SettingsTab extends PluginSettingTab {
 					.setButtonText("+")
 					.setCta()
 					.onClick(async () => {
-						this.plugin.settings.limitLinkDirectories.push("");
-            this.plugin.settings.limitLinkDirectoryOptions.push({symbol: '', fullpath: false});
+						this.plugin.settings.limitLinkDirectories.push({folder: "", symbol: "", fullpath: false});
 						await this.plugin.saveSettings();
 						return this.display();
 					});
 			});
 
 		this.plugin.settings.limitLinkDirectories.forEach(
-			(directory, index) => {
-        const fullpath = this.plugin.settings.limitLinkDirectoryOptions[index]?.fullpath ?? false;
+			(option, index) => {
+        const fullpath = option.fullpath ?? false;
 				const newDirectorySetting = new Setting(this.containerEl)
 					.setClass("at-symbol-linking-folder-container")
           .addText((text) => {
             text.setPlaceholder("@ (Triger Symbol)")
               .setValue(
-                this.plugin.settings.limitLinkDirectoryOptions[index]?.symbol?.toString()
+                option.symbol?.toString()
               )
               .onChange(async (value) => {
-                this.plugin.settings.limitLinkDirectoryOptions[index].symbol = value;
+                option.symbol = value;
                 await this.plugin.saveSettings();
               });
             text.inputEl.onblur = () => {
@@ -138,11 +135,11 @@ export class SettingsTab extends PluginSettingTab {
 					.addSearch((cb) => {
 						new FolderSuggest(this.app, cb.inputEl);
 						cb.setPlaceholder("Folder")
-							.setValue(directory)
+							.setValue(option.folder)
 							.onChange(async (newFolder) => {
 								this.plugin.settings.limitLinkDirectories[
 									index
-								] = newFolder.trim();
+								].folder = newFolder.trim();
 								await this.plugin.saveSettings();
 							});
 						cb.inputEl.onblur = () => {
@@ -155,11 +152,6 @@ export class SettingsTab extends PluginSettingTab {
 							.onClick(async () => {
 								arrayMove(
 									this.plugin.settings.limitLinkDirectories,
-									index,
-									index - 1
-								);
-								arrayMove(
-									this.plugin.settings.limitLinkDirectoryOptions,
 									index,
 									index - 1
 								);
@@ -176,11 +168,6 @@ export class SettingsTab extends PluginSettingTab {
 									index,
 									index + 1
 								);
-								arrayMove(
-									this.plugin.settings.limitLinkDirectoryOptions,
-									index,
-									index + 1
-								);
 								await this.plugin.saveSettings();
 								this.display();
 							});
@@ -193,10 +180,6 @@ export class SettingsTab extends PluginSettingTab {
 									index,
 									1
 								);
-								this.plugin.settings.limitLinkDirectoryOptions.splice(
-									index,
-									1
-								);
 								await this.plugin.saveSettings();
 								this.display();
 							});
@@ -206,8 +189,7 @@ export class SettingsTab extends PluginSettingTab {
               .setValue(fullpath)
               .setTooltip("Display fullpath in link text")
               .onChange(async (value: boolean) => {
-                this.plugin.settings.limitLinkDirectoryOptions[index] = this.plugin.settings.limitLinkDirectoryOptions[index] ?? {symbol: '', fullpath: false};
-                this.plugin.settings.limitLinkDirectoryOptions[index].fullpath = value;
+                this.plugin.settings.limitLinkDirectories[index].fullpath = value;
                 await this.plugin.saveSettings();
                 this.display();
               })
@@ -379,7 +361,7 @@ export class SettingsTab extends PluginSettingTab {
 		};
 
 		for (let i = 0; i < settings.limitLinkDirectories.length; i++) {
-			const folder = settings.limitLinkDirectories[i];
+			const folder = settings.limitLinkDirectories[i].folder;
 			if (folder === "") {
 				continue;
 			}
@@ -389,7 +371,7 @@ export class SettingsTab extends PluginSettingTab {
 					`Unable to find folder at path: ${folder}. Please add it if you want to limit links to this folder.`
 				);
 				const newFolders = [...settings.limitLinkDirectories];
-				newFolders[i] = "";
+				newFolders[i].folder = "";
 				await updateSetting("limitLinkDirectories", newFolders);
 			}
 		}

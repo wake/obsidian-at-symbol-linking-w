@@ -60,17 +60,17 @@ export default class SuggestionPopup extends EditorSuggest<
       // If there are folders to limit links to, check if the file is in one of them
 			if (this.settings.limitLinkDirectories.length > 0) {
 				let isAllowed = false;
-				for (const [index, folder] of this.settings.limitLinkDirectories.entries()) {
+				for (const [, option] of this.settings.limitLinkDirectories.entries()) {
 
-          if (folder === '') continue;
+          if (option.folder === '') continue;
 
-          const symbol = this.settings.limitLinkDirectoryOptions[index]?.symbol || '@';
+          const symbol = option.symbol || '@';
 
           if (symbol !== this.activeSymbol) continue;
 
-					if (file.path.startsWith(folder)) {
+					if (file.path.startsWith(option.folder)) {
 						isAllowed = true;
-            isFullpath = this.settings.limitLinkDirectoryOptions[index]?.fullpath || false;
+            isFullpath = option.fullpath || false;
 						break;
 					}
 				}
@@ -158,7 +158,7 @@ export default class SuggestionPopup extends EditorSuggest<
 
     let query = "";
 
-    const symbols = this.settings.limitLinkDirectoryOptions?.map(option => (option.symbol || '@')) || ['@'];
+    const symbols = this.settings.limitLinkDirectories?.map(option => (option.symbol || '@')) || ['@'];
     const maxSymbolLength = Math.max(...symbols.map(symbol => symbol.length));
 
     const catchedChars = editor.getRange(
