@@ -10,8 +10,9 @@ import { FolderSuggest } from "./folder-suggest";
 import { FileSuggest } from "./file-suggest";
 
 export interface AtSymbolLinkingSettings {
-	limitLinkDirectories: Array<string>;
+	triggerSymbol: string;
 	includeSymbol: boolean;
+	limitLinkDirectories: Array<string>;
 
 	showAddNewNote: boolean;
 	addNewNoteTemplateFile: string;
@@ -19,9 +20,15 @@ export interface AtSymbolLinkingSettings {
 
 	useCompatibilityMode: boolean;
 	leavePopupOpenForXSpaces: number;
+
+	invalidCharacterRegex: string;
+	invalidCharacterRegexFlags: string;
+
+	removeAccents: boolean;
 }
 
 export const DEFAULT_SETTINGS: AtSymbolLinkingSettings = {
+	triggerSymbol: "@",
 	limitLinkDirectories: [],
 	includeSymbol: true,
 
@@ -31,6 +38,12 @@ export const DEFAULT_SETTINGS: AtSymbolLinkingSettings = {
 
 	useCompatibilityMode: false,
 	leavePopupOpenForXSpaces: 0,
+
+	// eslint-disable-next-line no-useless-escape
+	invalidCharacterRegex: `[\[\]^|#]`,
+	invalidCharacterRegexFlags: "i",
+
+	removeAccents: true,
 };
 
 const arrayMove = <T>(array: T[], fromIndex: number, toIndex: number): void => {
@@ -44,37 +57,57 @@ const arrayMove = <T>(array: T[], fromIndex: number, toIndex: number): void => {
 
 export class SettingsTab extends PluginSettingTab {
 	plugin: AtSymbolLinking;
+	shouldReset: boolean;
 
 	constructor(app: App, plugin: AtSymbolLinking) {
 		super(app, plugin);
 		this.plugin = plugin;
+		this.shouldReset = false;
 	}
 
 	// On close, reload the plugin
 	hide() {
-		this.plugin.reloadPlugin();
+		this.plugin.reloadPlugin(this.shouldReset);
+		this.shouldReset = false;
 	}
 
 	display(): void {
 		this.containerEl.empty();
 
-		this.containerEl.appendChild(
-			createHeading(this.containerEl, "At Symbol (@) Linking Settings")
-		);
+		// Begin triggerSymbol option: Determine which symbol triggers the popup
+		const triggerSymbolDesc = document.createDocumentFragment();
+		triggerSymbolDesc.append("Type this symbol to trigger the popup.");
+		new Setting(this.containerEl)
+			.setName("Trigger Symbol")
+			.setDesc(triggerSymbolDesc)
+			.addText((text) => {
+				text.setPlaceholder("@")
+					.setValue(this.plugin.settings.triggerSymbol)
+					.onChange((value: string) => {
+						this.plugin.settings.triggerSymbol = value;
+						this.plugin.saveSettings();
+					});
+				text.inputEl.onblur = () => {
+					this.display();
+					this.validate();
+				};
+			});
 
 		// Begin includeSymbol option: Determine whether to include @ symbol in link
 		const includeSymbolDesc = document.createDocumentFragment();
 		includeSymbolDesc.append(
-			"Include the @ symbol prefixing the final link text",
+			`Include the ${this.plugin.settings.triggerSymbol} symbol prefixing the final link text`,
 			includeSymbolDesc.createEl("br"),
 			includeSymbolDesc.createEl("em", {
 				text: `E.g. [${
-					this.plugin.settings.includeSymbol ? "@" : ""
+					this.plugin.settings.includeSymbol
+						? this.plugin.settings.triggerSymbol
+						: ""
 				}evan](./evan)`,
 			})
 		);
 		new Setting(this.containerEl)
-			.setName("Include @ symbol")
+			.setName(`Include ${this.plugin.settings.triggerSymbol} symbol`)
 			.setDesc(includeSymbolDesc)
 			.addToggle((toggle) =>
 				toggle
@@ -90,9 +123,9 @@ export class SettingsTab extends PluginSettingTab {
 		// Begin limitLinksToFolders option: limit which folders links are sourced from
 		const ruleDesc = document.createDocumentFragment();
 		ruleDesc.append(
-			"@ linking will only source links from the following folders.",
+			`${this.plugin.settings.triggerSymbol} linking will only source links from the following folders.`,
 			ruleDesc.createEl("br"),
-			"For example, you might only want contacts in the Contacts/ folder to be linked when you type @.",
+			`For example, you might only want contacts in the Contacts/ folder to be linked when you type ${this.plugin.settings.triggerSymbol}.`,
 			ruleDesc.createEl("br"),
 			ruleDesc.createEl("em", {
 				text: "If no folders are added, links will be sourced from all folders.",
@@ -184,7 +217,7 @@ export class SettingsTab extends PluginSettingTab {
 		new Setting(this.containerEl)
 			.setName("Add new note if it doesn't exist")
 			.setDesc(
-				"If the note doesn't exist when @ linking, add an option to create the note."
+				`If the note doesn't exist when ${this.plugin.settings.triggerSymbol} linking, add an option to create the note.`
 			)
 			.addToggle((toggle) =>
 				toggle
@@ -201,7 +234,7 @@ export class SettingsTab extends PluginSettingTab {
 			// Begin add new note template folder
 			const newNoteTemplateDesc = document.createDocumentFragment();
 			newNoteTemplateDesc.append(
-				"Template to use when creating a new note from @ link.",
+				`Template to use when creating a new note from ${this.plugin.settings.triggerSymbol} link.`,
 				newNoteTemplateDesc.createEl("br"),
 				"Uses formats from the ",
 				newNoteTemplateDesc.createEl("a", {
@@ -246,7 +279,9 @@ export class SettingsTab extends PluginSettingTab {
 			// Begin add new note directory
 			new Setting(this.containerEl)
 				.setName("Add new note folder")
-				.setDesc("Folder to create new notes in when using @ linking.")
+				.setDesc(
+					`Folder to create new notes in when using ${this.plugin.settings.triggerSymbol} linking.`
+				)
 				.addSearch((cb) => {
 					new FolderSuggest(this.app, cb.inputEl);
 					cb.setPlaceholder("No folder (root)")
@@ -286,6 +321,7 @@ export class SettingsTab extends PluginSettingTab {
 				toggle
 					.setValue(this.plugin.settings.useCompatibilityMode)
 					.onChange((value: boolean) => {
+						this.shouldReset = true;
 						this.plugin.settings.useCompatibilityMode = value;
 						this.plugin.saveSettings();
 						this.plugin.registerPopup();
@@ -297,7 +333,7 @@ export class SettingsTab extends PluginSettingTab {
 		// Begin leavePopupOpenForXSpaces option
 		const leavePopupOpenDesc = document.createDocumentFragment();
 		leavePopupOpenDesc.append(
-			`When @ linking, you might want to type a full name e.g. "Brandon Sanderson" without the popup closing.`,
+			`When ${this.plugin.settings.triggerSymbol} linking, you might want to type a full name e.g. "Brandon Sanderson" without the popup closing.`,
 			leavePopupOpenDesc.createEl("br"),
 			leavePopupOpenDesc.createEl("em", {
 				text: "When set above 0, you'll need to press escape, return/enter, or type over X spaces to close the popup.",
@@ -321,9 +357,76 @@ export class SettingsTab extends PluginSettingTab {
 				};
 			});
 		// End leavePopupOpenForXSpaces option
+
+		new Setting(this.containerEl).setName("Advanced settings").setHeading();
+
+		// Begin invalid character regex option
+		const invalidCharacterRegexDesc = document.createDocumentFragment();
+		invalidCharacterRegexDesc.append(
+			invalidCharacterRegexDesc.createEl("br"),
+			"Characters typed that match this regex will not be included in the final search query in compatibility mode.",
+			invalidCharacterRegexDesc.createEl("br"),
+			"In normal mode, the popup will close when an invalid character is typed."
+		);
+
+		new Setting(this.containerEl)
+			.setName("Invalid character Regex")
+			.setDesc(invalidCharacterRegexDesc)
+			.addText((text) => {
+				text.setPlaceholder(this.plugin.settings.invalidCharacterRegex)
+					.setValue(this.plugin.settings.invalidCharacterRegex)
+					.onChange(async (value) => {
+						this.plugin.settings.invalidCharacterRegex = value;
+						await this.plugin.saveSettings();
+					});
+				text.inputEl.onblur = () => {
+					this.validate("invalidCharacterRegex");
+				};
+			});
+		// End valid character regex option
+
+		// Begin valid character regex flags option
+		const invalidCharacterRegexFlagsDesc =
+			document.createDocumentFragment();
+		invalidCharacterRegexFlagsDesc.append(
+			"Flags to use with the invalid character regex."
+		);
+
+		new Setting(this.containerEl)
+			.setName("Invalid character Regex flags")
+			.setDesc(invalidCharacterRegexFlagsDesc)
+			.addText((text) => {
+				text.setPlaceholder(
+					this.plugin.settings.invalidCharacterRegexFlags
+				)
+					.setValue(this.plugin.settings.invalidCharacterRegexFlags)
+					.onChange(async (value) => {
+						this.plugin.settings.invalidCharacterRegexFlags = value;
+						await this.plugin.saveSettings();
+					});
+				text.inputEl.onblur = () => {
+					this.validate("invalidCharacterRegexFlags");
+				};
+			});
+		// End valid character regex flags option
+
+		// Begin remove accents option
+		new Setting(this.containerEl)
+			.setName("Remove accents from search query")
+			.setDesc(
+				"e.g. é -> e when searching or creating links via the popup."
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.removeAccents)
+					.onChange((value: boolean) => {
+						this.plugin.settings.removeAccents = value;
+						this.plugin.saveSettings();
+					})
+			);
 	}
 
-	async validate() {
+	async validate(editedSetting?: string) {
 		const settings = this.plugin.settings;
 		const updateSetting = async (
 			setting: keyof AtSymbolLinkingSettings,
@@ -335,6 +438,16 @@ export class SettingsTab extends PluginSettingTab {
 			return this.display();
 		};
 
+		// triggerSymbol should be a single character
+		if (settings.triggerSymbol.length !== 1) {
+			new Notice(`Trigger symbol must be a single character.`);
+			await updateSetting(
+				"triggerSymbol",
+				settings.triggerSymbol.length ? settings.triggerSymbol[0] : "@"
+			);
+		}
+
+		// Folders should exist
 		for (let i = 0; i < settings.limitLinkDirectories.length; i++) {
 			const folder = settings.limitLinkDirectories[i];
 			if (folder === "") {
@@ -351,6 +464,7 @@ export class SettingsTab extends PluginSettingTab {
 			}
 		}
 
+		// Template file should exist when add new note option is enabled
 		if (settings.showAddNewNote && settings.addNewNoteTemplateFile) {
 			const templateFile = this.app.vault.getAbstractFileByPath(
 				`${settings.addNewNoteTemplateFile}.md`
@@ -363,6 +477,7 @@ export class SettingsTab extends PluginSettingTab {
 			}
 		}
 
+		// Destination directory should exist when add new note option is enabled
 		if (settings.showAddNewNote && settings.addNewNoteDirectory) {
 			const templateFile = this.app.vault.getAbstractFileByPath(
 				`${settings.addNewNoteDirectory}`
@@ -375,18 +490,39 @@ export class SettingsTab extends PluginSettingTab {
 			}
 		}
 
+		// Leave popup open for X spaces should be a number
 		if (
 			isNaN(parseInt(settings.leavePopupOpenForXSpaces.toString())) ||
 			settings.leavePopupOpenForXSpaces < 0
 		) {
 			await updateSetting("leavePopupOpenForXSpaces", 0);
 		}
-	}
-}
 
-function createHeading(el: HTMLElement, text: string, level = 2) {
-	const heading = el.createEl(`h${level}` as keyof HTMLElementTagNameMap, {
-		text,
-	});
-	return heading;
+		// Regex should be valid and not be empty
+		if (settings.invalidCharacterRegex?.trim() === "") {
+			await updateSetting(
+				"invalidCharacterRegex",
+				DEFAULT_SETTINGS.invalidCharacterRegex
+			);
+		}
+		try {
+			new RegExp(
+				settings.invalidCharacterRegex,
+				settings.invalidCharacterRegexFlags
+			);
+		} catch (e) {
+			new Notice(`Invalid regex or flags`);
+			if (editedSetting === "invalidCharacterRegex") {
+				await updateSetting(
+					"invalidCharacterRegex",
+					DEFAULT_SETTINGS.invalidCharacterRegex
+				);
+			} else if (editedSetting === "invalidCharacterRegexFlags") {
+				await updateSetting(
+					"invalidCharacterRegexFlags",
+					DEFAULT_SETTINGS.invalidCharacterRegexFlags
+				);
+			}
+		}
+	}
 }

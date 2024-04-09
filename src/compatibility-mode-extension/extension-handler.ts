@@ -4,6 +4,8 @@ import type { PluginValue, EditorView, Rect } from "@codemirror/view";
 import { Platform, type App, type EditorPosition } from "obsidian";
 import { AtSymbolLinkingSettings } from "src/settings/settings";
 import { LinkSuggest } from "./extension-popup";
+import { isValidFileNameCharacter } from "src/utils/valid-file-name";
+import { removeAccents } from "src/utils/remove-accents";
 
 // Max parents we will iterate through to determine if a click event is outside the suggestion popup
 const maxParentDepth = 5;
@@ -103,14 +105,16 @@ export function atSymbolTriggerExtension(
 					return false;
 				}
 
-				if (!this.isOpen && typedChar === "@") {
-					return this.openSuggestion();
+				let justOpened = false;
+				if (!this.isOpen && typedChar === settings.triggerSymbol) {
+					justOpened = true;
+					this.openSuggestion();
 				} else if (!this.isOpen) {
 					return false;
 				}
 
 				// Build query when open
-				const code = event.code.toLowerCase();
+				const key = event.key.toLocaleLowerCase();
 				if (typedChar === "Backspace") {
 					if (this.openQuery.length === 0) {
 						return this.closeSuggestion();
@@ -119,13 +123,17 @@ export function atSymbolTriggerExtension(
 				} else if (typedChar === "Escape") {
 					this.closeSuggestion();
 				} else if (
-					code.includes("key") ||
-					code.includes("digit") ||
-					code == "space"
+					!isValidFileNameCharacter(typedChar, settings) ||
+					event.altKey ||
+					event.metaKey ||
+					event.ctrlKey ||
+					key.includes("backspace") ||
+					key.includes("shift") ||
+					key.includes("arrow")
 				) {
-					this.openQuery += typedChar;
-				} else {
 					return false;
+				} else if (!justOpened) {
+					this.openQuery += typedChar;
 				}
 
 				// If query has more spaces alloted by the leavePopupOpenForXSpaces setting, close
@@ -136,6 +144,10 @@ export function atSymbolTriggerExtension(
 					this.openQuery.startsWith(" ")
 				) {
 					return this.closeSuggestion();
+				}
+
+				if (settings.removeAccents) {
+					this.openQuery = removeAccents(this.openQuery);
 				}
 
 				if (!this.suggestionEl && this.firstOpenedCursor && this.view) {
